@@ -1,3 +1,3 @@
-# Health-Risk-Assessments
+## Health-Risk-Assessments
 This repository is for health risk assessments of VOC source contributions in multiple sites in NYC metropolitan area using two types of health risk assessments, including total non-cancer health risk and lifetime cancer health risk. To estimate health risks, the total non-cancer health risk (THQ) will be calculated by adding up the Hazard Quotients of individual VOCs. If THQ > 1, the risk is unacceptable; if THQ < 1, the risk is acceptable. The lifetime cancer risk (LCR) will be calculated for benzene, which is classified as a “known” human carcinogen, for ethylbenzene, and for naphthalene. The inhalation cancer risk will be calculated by multiplying the air concentrations by the compound’s Inhalation Unit Risk (IUR). 
 Currently we are using about 16 VOC species, but I will be updating the RfC and IUR database in the coming days.
