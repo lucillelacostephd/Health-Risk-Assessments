@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Sep 24 10:08:11 2024
-Health risk assessment. Here, we excluded the residuals calculation because it introduces negative concentrations.
+Created on Wed Sep 25 10:32:56 2024
+Health risk assessment. Using the RfC database from USEPA. Molecular weights database was used too. 
 @author: lb945465
 """
 
@@ -15,6 +15,34 @@ import scipy.stats as stats
 concentration_dir = r'C:\Users\LB945465\OneDrive - University at Albany - SUNY\State University of New York\Spyder\1_Preparation of the Database\PMF_Dispersion'
 constrained_dir = r'C:\Users\LB945465\Desktop\DN PMF Optimal'
 source_profiles_file = os.path.join(constrained_dir, 'Source_Profiles_named.xlsx')
+rfc_file = r'C:\Users\LB945465\OneDrive - University at Albany - SUNY\State University of New York\Spyder\7_Health risk assessment\RfC_Toxicity_Values.xlsx'
+iur_file = r'C:\Users\LB945465\OneDrive - University at Albany - SUNY\State University of New York\Spyder\7_Health risk assessment\RfC_Toxicity_Values.xlsx'
+molecular_weight_file = r'C:\Users\LB945465\OneDrive - University at Albany - SUNY\State University of New York\Spyder\7_Health risk assessment\VOC unit conversion_detected species.xlsx'
+
+# Load RfC values from the Excel file
+rfc_data = pd.read_excel(rfc_file, sheet_name='Constants', index_col='Specie')
+
+# Remove special characters and reassign to the index
+rfc_data.index = rfc_data.index.str.replace(',', '', regex=True)
+
+rfc_values = rfc_data['RfC'].to_dict()  # Convert RfC values to dictionary
+
+# Load RfC values from the Excel file
+iur_data = pd.read_excel(iur_file, sheet_name='Constants', index_col='Specie')
+
+# Remove special characters and reassign to the index
+iur_data.index = iur_data.index.str.replace(',', '', regex=True)
+
+iur_values = iur_data['IUR'].to_dict()  # Convert RfC values to dictionary
+
+# Load molecular weights from the Excel file
+mw_data = pd.read_excel(molecular_weight_file, index_col='Specie')
+
+# Remove special characters and reassign to the index
+mw_data.index = mw_data.index.str.replace(',', '', regex=True)
+
+# Convert molecular weights to dictionary
+molecular_weights = mw_data['MW'].to_dict()
 
 # List of sites
 sites = ['Bronx', 'Queens', 'Kings', 'Richmond', 'Elizabeth', 'Chester']
@@ -69,51 +97,23 @@ for site in sites:
     VOC_unnorm.drop(columns=['VC_ratio'], inplace=True)
     
     voc_modelled_data[site] = VOC_unnorm
-    
-# Define molecular weights for selected VOC species (in g/mol)
-selected_molecular_weights = {
-    'Benzene': 78.11,
-    'Toluene': 92.14,
-    'Ethylbenzene': 106.17,
-    'm/p Xylene': 106.17,
-    'n-Hexane': 86.18,
-    'Cyclohexane': 84.16,
-    '13-Butadiene': 54.09,
-    'Styrene': 104.15,
-    'Chloroform': 119.38,
-    'Chloromethane': 50.49,
-    'Dichloromethane': 84.93,
-    '12-Dichloroethane': 98.96,
-    '14-Dichlorobenzene': 147.00,
-    'Tetrachloroethene': 165.83,
-    'Carbon tetrachloride': 153.82,
-    'Naphthalene': 128.17,
-    'n-Propylbenzene': 120.19,
-    '135-Trimethylbenzene': 120.19,
-    '124-Trimethylbenzene': 120.19,
-    '123-Trimethylbenzene': 120.19,
-    'n-Pentane': 72.15,
-    'n-Hexane': 86.18,
-    'n-Heptane': 100.20,
-    'n-Nonane': 128.26
-}
 
-# Function to convert ppbv to µg/m3
+# Function to convert ppbv to µg/m3 using molecular weight
 def ppbv_to_ugm3(concentration_ppbv, molecular_weight):
     # Convert concentration from ppbv to µg/m³
     return concentration_ppbv * (molecular_weight / 24.45)
 
-# Convert VOC_modelled data to µg/m3 for selected species only
+# Convert VOC_modelled data to µg/m3 for selected species using the molecular weights from the loaded database
 for site, df in voc_modelled_data.items():
     # Create a new dataframe to store the converted values
     df_ugm3 = pd.DataFrame(index=df.index)
     
     for voc in df.columns:
-        if voc in selected_molecular_weights:
-            # Convert each VOC to µg/m³ using the molecular weight
-            df_ugm3[voc] = ppbv_to_ugm3(df[voc], selected_molecular_weights[voc])
+        if voc in molecular_weights:
+            # Convert each VOC to µg/m³ using the molecular weight from the database
+            df_ugm3[voc] = ppbv_to_ugm3(df[voc], molecular_weights[voc])
         else:
-            print(f"Skipping {voc} - not in selected species list.")
+            print(f"Skipping {voc} - not in molecular weight database.")
     
     # Replace the original ppbv dataframe with the converted µg/m³ dataframe
     voc_modelled_data[site] = df_ugm3
@@ -124,53 +124,6 @@ EF = 350   # Exposure frequency in days/year
 ED = 24    # Exposure duration in years
 AT_general = 25 * 365 * 24  # Averaging time in hours for non-cancer risk (25 years)
 AT_lifetime = 70 * 365 * 24 # Averaging time in hours for lifetime cancer risk (70 years)
-
-# Updated RfC values for selected VOC species (in µg/m³)
-rfc_values = {
-    'Benzene': 30,                # 0.03 mg/m³ converted to µg/m³, Besis et al. (2024)
-    'Toluene': 5000,              # 5 mg/m³ converted to µg/m³, Besis et al. (2024)
-    'Ethylbenzene': 1000,         # 1 mg/m³ converted to µg/m³, Besis et al. (2024)
-    'm/p Xylene': 100,            # 0.1 mg/m³ converted to µg/m³, Besis et al. (2024)
-    'n-Hexane': 700,              # 0.7 mg/m³ converted to µg/m³, Besis et al. (2024)
-    'Cyclohexane': 6000,          # Previously known, Bari et al. (2018)
-    '13-Butadiene': 2,           # Previously known, Bari et al. (2018)
-    'Styrene': 1000,              # Previously known, Bari et al. (2018)
-    'Chloroform': 98,             # Previously known, Bari et al. (2018)
-    'Chloromethane': 90,          # Previously known, Bari et al. (2018)
-    'Dichloromethane': 600,       # Previously known, Bari et al. (2018)
-    '12-Dichloroethane': 2400,   # Previously known, Bari et al. (2018)
-    '14-Dichlorobenzene': 800,   # Previously known, Bari et al. (2018)
-    'Tetrachloroethene': 40,      # Previously known, Bari et al. (2018)
-    'Carbon tetrachloride': 100,  # Previously known, Bari et al. (2018)
-    'Naphthalene': 3,             # 0.003 mg/m³ converted to µg/m³, Besis et al. (2024)
-    'n-Propylbenzene': 1000,      # 1 mg/m³ converted to µg/m³, Besis et al. (2024)
-    '135-Trimethylbenzene': 60, # 0.06 mg/m³ converted to µg/m³, Besis et al. (2024)
-    '124-Trimethylbenzene': 60, # 0.06 mg/m³ converted to µg/m³, Besis et al. (2024)
-    '123-Trimethylbenzene': 60, # 0.06 mg/m³ converted to µg/m³, Besis et al. (2024)
-    'n-Pentane': 1000,            # 1 mg/m³ converted to µg/m³, Besis et al. (2024)
-    'n-Heptane': 400,             # 0.4 mg/m³ converted to µg/m³, Besis et al. (2024)
-    'n-Nonane': 20                # 0.02 mg/m³ converted to µg/m³, Besis et al. (2024)
-}
-
-# Define the Inhalation Unit Risk (IUR) values for known species
-iur_values = {
-    'Benzene': 7.80E-06,
-    'Toluene': None,  # No IUR value available
-    'Ethylbenzene': 2.50E-06,
-    'm/p Xylene': None,  # No IUR value available
-    'n-Hexane': None,  # No IUR value available
-    'Cyclohexane': None,  # No IUR value available
-    '13-Butadiene': 0.00003,
-    'Styrene': None,  # No IUR value available
-    'Chloroform': None,  # No IUR value available
-    'Chloromethane': None,  # No IUR value available
-    'Dichloromethane': 1.00E-08,
-    '12-Dichloroethane': 2.60E-05,
-    '14-Dichlorobenzene': 1.10E-05,
-    'Tetrachloroethene': 2.60E-07,
-    'Carbon tetrachloride': 6.00E-06,
-    'Naphthalene': 3.40E-05
-}
 
 # Function to calculate Exposure Concentration (EC)
 def calculate_ec(concentration, et, ef, ed, at):
@@ -322,6 +275,34 @@ for site in sites:
 for site, df in lcr_factors.items():
     print(f"\nLCR Factors for {site} (first 5 rows):")
     print(df.head())
+
+# Create lists to keep track of missing RfC and IUR values
+missing_rfc = []
+missing_iur = []
+
+# Calculate LCR for each site and VOC species
+for site, ec_df in ec_results.items():
+    # Create a new dataframe to store LCR values
+    lcr_df = pd.DataFrame(index=ec_df.index)
+    
+    for voc in ec_df.columns:
+        if voc in iur_values and iur_values[voc] is not None:
+            # Calculate LCR by multiplying EC with IUR
+            lcr = ec_df[voc] * iur_values[voc]
+            lcr_df[voc] = lcr
+        elif voc not in iur_values or iur_values[voc] is None:
+            print(f"Skipping {voc} - IUR value not available.")
+            missing_iur.append(voc)  # Track missing IUR values
+    
+    # Store the calculated LCR values for the site
+    lcr_results[site] = lcr_df
+
+# Output the list of missing RfC and IUR values
+print("\nMissing RfC values:")
+print(set(missing_rfc))
+
+print("\nMissing IUR values:")
+print(set(missing_iur))
     
 # Function to visualize results (HQ or LCR) with 95% confidence intervals
 def visualize_risk_assessment_with_ci(factors_data, assessment_type='HQ'):
@@ -375,7 +356,7 @@ def visualize_risk_assessment_with_ci(factors_data, assessment_type='HQ'):
     plt.figure(figsize=(15, 5), dpi=300)
     
     for site, value_series in total_values.items():
-        plt.plot(value_series.index, value_series, label=site)
+        plt.plot(value_series.index, value_series, label=site, alpha=0.7)
     
     plt.xlabel('Date')
     plt.ylabel(f'Total {assessment_type}')
